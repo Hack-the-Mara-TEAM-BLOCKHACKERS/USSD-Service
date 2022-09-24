@@ -148,7 +148,7 @@ const ussdStarter = (req, res, next) => {
 
                             }).then((response) => {
                                 let code = response.data["status"]
-                                //console.log(response.data);
+                                console.log(response.data);
                                 if (code == 'SE200') {
                                     // console.log(response['success']);
                                     let getEncrypt = uuidv4();
