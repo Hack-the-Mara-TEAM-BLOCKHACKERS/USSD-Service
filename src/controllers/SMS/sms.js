@@ -9,13 +9,13 @@ const Africastalking = require('africastalking')(credentials);
 // Initialize a service e.g. SMS
 const sms = Africastalking.SMS
 
-async function sendSMS(id) {
+async function sendSMS(id,num) {
     
     try {
         const result=await sms.send({
              // Set the numbers you want to send to in international format
       //  to: ['+2349037137077', '+254733YYYZZZ'],
-          to: '+2349037137077', 
+          to: num, 
           message: `Welcome to SOPA-ERETO. Please save this number ${id} as this is your ID,you can access and verify your information using this ID by dailing *384*63450*3#`,
           from: 'Sopa-Ereto'
         });
@@ -27,4 +27,22 @@ async function sendSMS(id) {
 
 };
 
-module.exports = sendSMS;
+
+async function allSMS(group,messageBody){
+    
+  try {
+      const result=await sms.send({
+        to: group, 
+        message: messageBody,
+        from: 'Sopa-Ereto'
+      });
+     console.log(result.SMSMessageData);
+
+    } catch(ex) {
+      console.error(ex);
+    } 
+
+};
+
+module.exports = {sendSMS,
+allSMS}

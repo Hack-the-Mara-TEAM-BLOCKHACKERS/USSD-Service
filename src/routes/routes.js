@@ -2,7 +2,7 @@ const express=require('express');
 const router=express.Router();
 const controller=require('../controllers/ussd/ussd')
 const homeController=require('../controllers/home')
-const smsController=require('../controllers/home')
+const smsController=require('../controllers/SMS/sms_controller')
 
 
 
@@ -10,7 +10,7 @@ const smsController=require('../controllers/home')
  router.post('/',controller.ussdStarter);
 
  router.get('/', homeController.home)
- router.get('/', smsController.home)
+ router.post('/sendSMS', smsController.broadcastSMS)
 
 
 

@@ -13,10 +13,11 @@ var name = "";
 var surname = "";
 var middleName = "";
 let responseData = {};
-const sendSMS = require('../sms');
+const sendSMS = require('../SMS/sms');
 
-
-
+var urlCode='';
+var payload={};
+var stat=0;
 const ussdStarter = (req, res, next) => {
 
 
@@ -74,6 +75,7 @@ const ussdStarter = (req, res, next) => {
     //LANDOWNER
     menu.state('owner', {
         run: () => {
+            stat=1;
             // use menu.con() to send response without terminating session      
             menu.con('Please enter your National ID number:');
 
@@ -83,7 +85,7 @@ const ussdStarter = (req, res, next) => {
         },
         next: {
             //append user input details to next state
-            '*\\d+': 'validater'
+            '*\\d+': 'validater_owner'
         }
     });
 
@@ -92,6 +94,7 @@ const ussdStarter = (req, res, next) => {
     //RANGER
     menu.state('ranger', {
         run: () => {
+            stat=2;
             // use menu.con() to send response without terminating session      
             menu.con('Please enter your National ID number to verify your identity:');
 
@@ -104,6 +107,95 @@ const ussdStarter = (req, res, next) => {
             '*\\d+': 'validater'
         }
     });
+
+
+
+
+
+    //VALIDATE NATIONAL IDENTITY NUMBER
+    menu.state('validater_owner', {
+        run: async () => {
+            //var id = "237721480";
+            //get user iput and set as id
+            var NID = menu.val
+            try {
+                await axios({
+                    method: "post",
+                    url: `http://api.sandbox.youverify.co/v2/api/identity/ke/national-id`,
+                    data: {
+                        "id": NID,
+                        "isSubjectConsent": true
+                    },
+                    headers: {
+                        token: 'hEGOABo0.axF4vmsgeE2RxDPyF2UDIrU1ls0eG5L7jL0G',
+                    },
+                }).then((response) => {
+                    responseData = response.data;
+                    const removeSpaces = str => str.replace(/\s/g, '');
+                    //console.log(responseData);
+                    //console.log(response.data["data"]['status']);
+                    if (responseData["data"]['status'] == 'found') {
+                        // console.log(response.data['success']);
+                        name = responseData["data"]['firstName'];
+                        middleName = removeSpaces(responseData["data"]['middleName'].trim());
+                        surname = responseData["data"]['lastName'];
+                       // console.log(middleName);
+                        try {
+                            axios({
+                                method: "post",
+                                url: `https://sopa-ereto-diam.herokuapp.com/mcs2/validate-LandOwner`,
+                                data: { "firstName": name, "lastName": surname, "middleName": middleName },
+
+                            }).then((response) => {
+                                let code = response.data["status"]
+                                //console.log(response.data);
+                                if (code == 'SE200') {
+                                    // console.log(response['success']);
+                                    let getEncrypt = uuidv4();
+                                    yourID = ID.generate(new Date().toJSON());
+                                    userID = `${getEncrypt}${yourID}`;
+                                    var newName = response.data["data"]["firstName"]
+                                    var newsurname = response.data["data"]["lastName"]
+                                    var newMiddleName = response.data["data"]["middleName"]
+
+                                    let fullName = `${newName} ${newMiddleName} ${newsurname}`
+
+                                    menu.con('Hello ' + fullName + ' select an account type to recieve payments:' +
+                                        '\n1. Mpesa' +
+                                        '\n2. Bank Account');
+                                } if (code == 'SE404') {
+                                    menu.end('Looks like something is wrong!, we could not find your data on the company records.');
+                                }
+                            })
+                        } catch (error) {
+
+                        }
+
+                    }
+
+                });
+
+            } catch (error) {
+                if (error.response['data']['success'] == false) {
+                   // console.log(error.response['data'])
+                    menu.con('Looks like something is wrong!, we could not find your National ID.' +
+                        '\n Enter it again');
+
+                }
+            }
+        },
+
+
+        next: {
+            //get account type
+            '1': 'Mpesa',
+            '2': 'Bank'
+        }
+    });
+
+
+
+
 
 
 
@@ -128,7 +220,7 @@ const ussdStarter = (req, res, next) => {
                     },
                 }).then((response) => {
                     responseData = response.data;
-                    //console.log(responseData["data"]);
+                    //console.log(responseData);
                     //console.log(response.data["data"]['status']);
                     if (responseData["data"]['status'] == 'found') {
                         // console.log(response.data['success']);
@@ -144,7 +236,8 @@ const ussdStarter = (req, res, next) => {
                             }).then((response) => {
                                 let code = response.data["status"]
                                 console.log(response.data);
-                                if (code == 'SE200') {
+                                if (code == 'SE200'&& stat==2) {
+                                    payload=response.data["data"]
                                     // console.log(response['success']);
                                     let getEncrypt = uuidv4();
                                     yourID = ID.generate(new Date().toJSON());
@@ -172,7 +265,7 @@ const ussdStarter = (req, res, next) => {
 
             } catch (error) {
                 if (error.response['data']['success'] == false) {
-                    console.log(error.response['data'])
+                   // console.log(error.response['data'])
                     menu.con('Looks like something is wrong!, we could not find your National ID.' +
                         '\n Enter it again');
 
@@ -208,7 +301,7 @@ const ussdStarter = (req, res, next) => {
     menu.state('Bank', {
         run: () => {
             menu.con('Enter your Bank Account Number:');
-            var tourMpesaResult = Number(menu.val);
+            var tourBankResult = Number(menu.val);
 
         },
         next: {
@@ -219,12 +312,21 @@ const ussdStarter = (req, res, next) => {
     // nesting states
     menu.state('Result', {
         run: async () => {
-            await sendSMS(yourID);
+            let userPhone=  menu.args.phoneNumber;
+            await sendSMS.sendSMS(yourID,userPhone);
+            if (stat=1) {
+             urlLink=`https://sopa-ereto-diam.herokuapp.com/mcs2/save-Ranger`;
+           
+            } if(stat=2){
+               urlLink=`https://sopa-ereto-diam.herokuapp.com/mcs2/save-LandOwner`;
+           
+               
+            }
             try {
-                console.log(name);
+               // console.log(name);
                 await axios({
                     method: "post",
-                    url: `https://sopa-ereto-diam.herokuapp.com/mcs2/save-Keeper`,
+                    url: urlCode,
                     data: { "name": name, "password": surname, },
 
                 }).then((response) => {
@@ -236,8 +338,8 @@ const ussdStarter = (req, res, next) => {
             } catch (error) {
                 console.log(error);
             }
-
-            menu.end(`Successful Registration! Your user ID is ${yourID}. Welcome to Sopa-Ereto.`);
+         
+            menu.end(`Successful Registration! ${userPhone} Your user ID is ${yourID}. Welcome to Sopa-Ereto.`);
         }
     });
 
