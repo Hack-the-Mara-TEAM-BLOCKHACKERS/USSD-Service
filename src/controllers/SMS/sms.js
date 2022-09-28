@@ -19,7 +19,7 @@ async function sendSMS(id,num) {
           message: `Welcome to SOPA-ERETO. Please save this number ${id} as this is your ID,you can access and verify your information using this ID by dailing *384*63450*3#`,
           from: 'Sopa-Ereto'
         });
-        console.log(result.SMSMessageData['Recipients']);
+       // console.log(result.SMSMessageData['Recipients']);
 
       } catch(ex) {
         console.error(ex);
@@ -36,7 +36,7 @@ async function allSMS(group,messageBody){
         message: messageBody,
         from: 'Sopa-Ereto'
       });
-     console.log(result.SMSMessageData);
+    // console.log(result.SMSMessageData);
 
     } catch(ex) {
       console.error(ex);

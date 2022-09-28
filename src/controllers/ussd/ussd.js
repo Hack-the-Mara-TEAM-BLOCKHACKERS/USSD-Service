@@ -7,17 +7,18 @@ const { encrypt, compare } = require('../../services/crypto');
 const { generateOTP } = require('../../services/OTP');
 let menu = new UssdMenu()
 var gg = '';
-var userID = '';
+
 let yourID = '';
 var name = "";
 var surname = "";
 var middleName = "";
 let responseData = {};
 const sendSMS = require('../SMS/sms');
-
-var urlCode='';
-var payload={};
-var stat=0;
+var acct = "";
+var saveData = {};
+var saveData2 = {};
+var payload = {};
+var stat = 0;
 const ussdStarter = (req, res, next) => {
 
 
@@ -33,12 +34,12 @@ const ussdStarter = (req, res, next) => {
 
 
 
-              
-                    // //const hashedPassword = await encrypt(password);
-                    // const otpGenerated = generateOTP();
-                    // console.log(otpGenerated)
-                   
-                  
+
+            // //const hashedPassword = await encrypt(password);
+            // const otpGenerated = generateOTP();
+            // console.log(otpGenerated)
+
+
         },
         // next object links to next state based on user input
         next: {
@@ -75,7 +76,7 @@ const ussdStarter = (req, res, next) => {
     //LANDOWNER
     menu.state('owner', {
         run: () => {
-            stat=1;
+            stat = 1;
             // use menu.con() to send response without terminating session      
             menu.con('Please enter your National ID number:');
 
@@ -85,7 +86,7 @@ const ussdStarter = (req, res, next) => {
         },
         next: {
             //append user input details to next state
-            '*\\d+': 'validater_owner'
+            '*\\d+': 'validate_owner'
         }
     });
 
@@ -94,7 +95,7 @@ const ussdStarter = (req, res, next) => {
     //RANGER
     menu.state('ranger', {
         run: () => {
-            stat=2;
+            stat = 2;
             // use menu.con() to send response without terminating session      
             menu.con('Please enter your National ID number to verify your identity:');
 
@@ -104,7 +105,7 @@ const ussdStarter = (req, res, next) => {
         },
         next: {
             //append user input to next state
-            '*\\d+': 'validater'
+            '*\\d+': 'validate_ranger'
         }
     });
 
@@ -113,7 +114,7 @@ const ussdStarter = (req, res, next) => {
 
 
     //VALIDATE NATIONAL IDENTITY NUMBER
-    menu.state('validater_owner', {
+    menu.state('validate_ranger', {
         run: async () => {
             //var id = "237721480";
             //get user iput and set as id
@@ -139,16 +140,19 @@ const ussdStarter = (req, res, next) => {
                         name = responseData["data"]['firstName'];
                         middleName = removeSpaces(responseData["data"]['middleName'].trim());
                         surname = responseData["data"]['lastName'];
-                       // console.log(middleName);
+                        // console.log(middleName);
                         try {
                             axios({
                                 method: "post",
-                                url: `https://sopa-ereto-diam.herokuapp.com/mcs2/validate-LandOwner`,
+                                url: `https://sopa-ereto-diam.herokuapp.com/mcs2/validate-Ranger`,
                                 data: { "firstName": name, "lastName": surname, "middleName": middleName },
 
                             }).then((response) => {
+                                saveData = response.data['data'];
+                                //console.log(saveData);
+
                                 let code = response.data["status"]
-                                console.log(response.data);
+                                // console.log(response.data);
                                 if (code == 'SE200') {
                                     // console.log(response['success']);
                                     let getEncrypt = uuidv4();
@@ -177,7 +181,7 @@ const ussdStarter = (req, res, next) => {
 
             } catch (error) {
                 if (error.response['data']['success'] == false) {
-                   // console.log(error.response['data'])
+                    // console.log(error.response['data'])
                     menu.con('Looks like something is wrong!, we could not find your National ID.' +
                         '\n Enter it again');
 
@@ -188,21 +192,16 @@ const ussdStarter = (req, res, next) => {
 
         next: {
             //get account type
-            '1': 'Mpesa',
-            '2': 'Bank'
+            '1': 'Mpesa_r',
+            '2': 'Bank_r'
         }
     });
 
 
 
 
-
-
-
-
-
     //VALIDATE NATIONAL IDENTITY NUMBER
-    menu.state('validater', {
+    menu.state('validate_owner', {
         run: async () => {
             //var id = "237721480";
             //get user iput and set as id
@@ -220,30 +219,34 @@ const ussdStarter = (req, res, next) => {
                     },
                 }).then((response) => {
                     responseData = response.data;
+                    const removeSpaces = str => str.replace(/\s/g, '');
                     //console.log(responseData);
                     //console.log(response.data["data"]['status']);
                     if (responseData["data"]['status'] == 'found') {
                         // console.log(response.data['success']);
                         name = responseData["data"]['firstName'];
-                        middleName = responseData["data"]['middleName'];
+                        middleName = removeSpaces(responseData["data"]['middleName'].trim());
                         surname = responseData["data"]['lastName'];
+                        // console.log(middleName);
                         try {
                             axios({
                                 method: "post",
-                                url: `https://sopa-ereto-diam.herokuapp.com/mcs2/validate-Ranger`,
-                                data: { "name": name, "surname": surname, "middleName": middleName },
+                                url: `https://sopa-ereto-diam.herokuapp.com/mcs2/validate-LandOwner`,
+                                data: { "firstName": name, "lastName": surname, "middleName": middleName },
 
                             }).then((response) => {
+                                saveData2 = response.data['data'];
+                                //console.log(saveData);
+
                                 let code = response.data["status"]
-                                console.log(response.data);
-                                if (code == 'SE200'&& stat==2) {
-                                    payload=response.data["data"]
+                                // console.log(response.data);
+                                if (code == 'SE200') {
                                     // console.log(response['success']);
                                     let getEncrypt = uuidv4();
                                     yourID = ID.generate(new Date().toJSON());
                                     userID = `${getEncrypt}${yourID}`;
-                                    var newName = response.data["data"]["name"]
-                                    var newsurname = response.data["data"]["surname"]
+                                    var newName = response.data["data"]["firstName"]
+                                    var newsurname = response.data["data"]["lastName"]
                                     var newMiddleName = response.data["data"]["middleName"]
 
                                     let fullName = `${newName} ${newMiddleName} ${newsurname}`
@@ -265,7 +268,7 @@ const ussdStarter = (req, res, next) => {
 
             } catch (error) {
                 if (error.response['data']['success'] == false) {
-                   // console.log(error.response['data'])
+                    // console.log(error.response['data'])
                     menu.con('Looks like something is wrong!, we could not find your National ID.' +
                         '\n Enter it again');
 
@@ -276,74 +279,185 @@ const ussdStarter = (req, res, next) => {
 
         next: {
             //get account type
-            '1': 'Mpesa',
-            '2': 'Bank'
+            '1': 'Mpesa_o',
+            '2': 'Bank_o'
         }
     });
 
-
     //mpesa
-    menu.state('Mpesa', {
+    menu.state('Mpesa_r', {
         run: () => {
             menu.con('Enter your Mpesa Phone Number:');
-            var tourMpesaResult = Number(menu.val);
+
 
         },
         next: {
             // using regex to match user input to next state
-            '*\\d+': 'Result'
+            '*\\d+': 'Result_r'
         }
     });
 
 
 
     //bank
-    menu.state('Bank', {
+    menu.state('Bank_r', {
         run: () => {
             menu.con('Enter your Bank Account Number:');
-            var tourBankResult = Number(menu.val);
+
 
         },
         next: {
             // using regex to match user input to next state
-            '*\\d+': 'Result'
+            '*\\d+': 'Result_r'
         }
     });
+
+
+
+
+    //mpesa
+    menu.state('Mpesa_o', {
+        run: () => {
+            menu.con('Enter your Mpesa Phone Number:');
+
+
+        },
+        next: {
+            // using regex to match user input to next state
+            '*\\d+': 'Result_o'
+        }
+    });
+
+
+
+    //bank
+    menu.state('Bank_o', {
+        run: () => {
+            menu.con('Enter your Bank Account Number:');
+
+
+        },
+        next: {
+            // using regex to match user input to next state
+            '*\\d+': 'Result_o'
+        }
+    });
+
+
+
     // nesting states
-    menu.state('Result', {
+    menu.state('Result_r', {
         run: async () => {
-            let userPhone=  menu.args.phoneNumber;
-            await sendSMS.sendSMS(yourID,userPhone);
-            if (stat=1) {
-             urlLink=`https://sopa-ereto-diam.herokuapp.com/mcs2/save-Ranger`;
-           
-            } if(stat=2){
-               urlLink=`https://sopa-ereto-diam.herokuapp.com/mcs2/save-LandOwner`;
-           
-               
-            }
+            acct = Number(menu.val);
+            let userPhone = menu.args.phoneNumber;
+            menu.end(`Successful Registration! Your user ID is ${yourID}. Welcome to Sopa-Ereto.`);
+            let newData=  {
+                "_id": yourID.toString(),
+                "address": 'Mara',
+                "gender": saveData['gender'].toString(),
+                "dob": saveData['dateOfBirth'].toString(),
+                "phone": saveData['phone'].toString(),
+                "middleName": saveData['middleName'].toString(),
+                "firstName": saveData['firstName'].toString(),
+                "lastName": saveData['lastName'].toString(),
+                "account": acct.toString(),
+                "fullName": saveData['fullName'].toString()
+
+            };
+            console.log(newData);
             try {
-               // console.log(name);
+                // console.log(name);
                 await axios({
                     method: "post",
-                    url: urlCode,
-                    data: { "name": name, "password": surname, },
+                    url: `https://sopa-ereto-diam.herokuapp.com/mcs2/save-Ranger`,
+                     data:newData
+                   
 
                 }).then((response) => {
-                    console.log(response.data['Data']['args']);
+                    if (response.data['status'] == 'SE200') {
+                        try {
+
+                            sendSMS.sendSMS(yourID, userPhone);
+                        } catch (error) {
+
+                        }
+
+                    } else {
+
+                    }
+
 
 
 
                 })
             } catch (error) {
-                console.log(error);
+                console.log(error.data);
             }
-         
-            menu.end(`Successful Registration! ${userPhone} Your user ID is ${yourID}. Welcome to Sopa-Ereto.`);
+
+
         }
     });
 
 
+
+
+    // nesting states
+    menu.state('Result_o', {
+        run: async () => {
+
+            acct = Number(menu.val);
+            let userPhone = menu.args.phoneNumber;
+            
+
+console.log(saveData2)
+
+
+let newData2={
+    "_id": yourID.toString(),
+    "middleName": saveData2['middleName'].toString(),
+    "firstName": saveData2['firstName'].toString(),
+    "lastName": saveData2['lastName'].toString(),
+    "address": saveData2['userAddress'].toString(),
+    "gender": saveData2['gender'].toString(),
+    "dob": saveData2['dateOfBirth'].toString(),
+    "phone": userPhone.toString(),
+    "account": acct.toString(),
+    "acreSize": saveData2['acreSize'].toString(),
+    "fullName": saveData2['fullName'].toString(),
+    "conservancy": saveData2['conservancy'].toString(),
+
+};
+console.log(newData2)
+           menu.end(`Successful Registration! Your user ID is ${yourID}. Welcome to Sopa-Ereto.`);
+            try {
+                // console.log(name);
+                await axios({
+                    method: "post",
+                    url: `https://sopa-ereto-diam.herokuapp.com/mcs2/save-LandOwner`,
+                     data:newData2,
+                    
+                }).then((response) => {
+
+                     console.log(response.data)
+                    if (response.data['status'] == 'SE200') {
+                        try {
+
+                            sendSMS.sendSMS(yourID, userPhone);
+                        } catch (error) {
+
+                        }
+
+                    } else {
+
+                    }
+                })
+            } catch (error) {
+                console.log(error.data);
+            }
+
+
+        }
+    });
 
 
 
@@ -414,12 +528,12 @@ const ussdStarter = (req, res, next) => {
 
 
 
-              
+
 
         },
 
 
-        
+
 
     });
 
